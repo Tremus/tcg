@@ -1,0 +1,15 @@
+html
+  head
+    title= "Library"
+    link(rel="shortcut icon" href="/assets/favicon.ico")
+  body
+    div(style={display: 'flex', ['flex-wrap']: 'wrap'})
+      each card in cards.edges
+        a(href=`/card/${card.pk}/`)
+          div(style={padding: 10})
+            img(src=`/assets/thumbs/${card.imageName}.jpg` alt=`${card.imageName}`)
+    div
+      if page !== 0
+        a(href=`?page=${page - 1}` style={float: 'left'})= "Previous page"
+      if cards.cursor.after !== cards.count
+        a(href=`?page=${page + 1}` style={float: 'right'})= "Next page"

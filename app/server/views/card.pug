@@ -1,0 +1,17 @@
+html
+  head
+    title= card.name
+    link(rel="shortcut icon" href="/assets/favicon.ico")
+  body
+    div(style={display: 'flex'})
+      div
+        img(src=`/assets/cards/${card.imageName}.jpg` alt=`${card.imageName}`)
+      ol
+        each ability in card.abilities
+          li= ability
+    div
+      if card.pk > 1
+        a(href=`/card/${card.pk - 1}/` style={float: 'left'})
+          span= "Previous"
+      a(href=`/card/${card.pk + 1}/` style={float: 'right'})
+        span= "Next"
