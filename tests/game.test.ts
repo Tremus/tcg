@@ -1,5 +1,5 @@
 import Game from '../src/game';
-import { Phase, Civilization } from '../src/types';
+import { Card, Phase, Civilization } from '../src/types';
 import AquaHulcus from '../src/cards/AquaHulcus';
 import BurningMane from '../src/cards/BurningMane';
 import { TESTING_BREAKPOINT } from '../src/utils';
@@ -291,6 +291,7 @@ test('Game.runDrawPhase', () => {
     expect(mock).toHaveBeenCalledTimes(2);
 });
 
+// - Mana
 test('Game.runManaPhase - test end phase (N)', async () => {
     const game = new Game();
     const mock = jest.fn();
@@ -399,7 +400,77 @@ test('Game.runPlayPhase - test loops good input ([0-9])', async () => {
     expect(mock2).toBeCalledWith(0);
 });
 
-// TODO: runAttackPhase
+// - Attack
+test('Game.runAttackPhase - test end phase (N)', async () => {
+    const game = new Game();
+    const mock = jest.fn();
+    mock.mockResolvedValue('N');
+    game._getUserInput = mock;
+    await game.runAttackPhase();
+
+    expect(game.getCurrentPhase()).toBe(Phase.end);
+});
+
+test('Game.runAttackPhase - test bad input (![0-9])', () => {
+    const game = new Game();
+
+    // no input
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('');
+    game._getUserInput = mock1;
+
+    expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
+
+    // invalid number
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('also bad input');
+    game._getUserInput = mock2;
+
+    expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.runAttackPhase - test bad target', () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    // missing target
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('1');
+    game._getUserInput = mock1;
+
+    expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
+
+    // input good, but target is tapped
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('0');
+    game._getUserInput = mock2;
+    game.tapCreature('player1', 0);
+
+    expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
+
+    // target cannot attack
+    const card = new AquaHulcus(game.getGame, 'player1');
+    (card as Card).cantAttack = true;
+    game.state.player1.battleZone = [card];
+
+    expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.runAttackPhase - test loops on good input ([0-9])', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game._getUserInput = mock1;
+
+    const mock2 = jest.fn();
+    game.findAttackTarget = mock2;
+
+    await game.runAttackPhase();
+
+    expect(mock2).toBeCalledWith(0);
+});
 
 // - End
 test('Game.runEndPhase()', () => {

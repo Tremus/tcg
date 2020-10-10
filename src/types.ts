@@ -68,7 +68,7 @@ export type Card = {
     onEndPhase?: Function;
     onStartPhase?: Function;
 
-    canAttack?: boolean;
+    cantAttack?: boolean;
     canAttackPlayers?: boolean;
     canAttackCreatures?: boolean;
     canAttackUntappedCreatures?: boolean;

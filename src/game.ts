@@ -256,17 +256,38 @@ export default class Game implements GameAttributes {
         this.setCurrentPhase(Phase.attack);
     }
 
-    // TODO write & test
     async runAttackPhase() {
         // 5. Attack with creatures
         // 5.1 Player selects any number of eligible creatures to attack (eg. canAttack = true)
-        // 5.2 Player selects eligible target (creature / shield(s))
-        // 5.2.1 Trigger onAttack() effect of attacker
-        // 5.2.2 Trigger onOtherCreatureAttack() effect of other creatures
-        // if creature
-        // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
-        // elif shield
-        // 5.2.3 Trigger onShieldTrigger() effect of shield
+        while (true) {
+            // 3.1 Player may add cards to their mana zone from their hand equal to their 'turnManaCount'
+            const input = await this._getUserInput(
+                'Select a creature to attack with ([0-9+]: Target card, [N]: End phase)',
+            );
+            if (!input) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if (input.toLowerCase() === 'n') {
+                break;
+            }
+            const idx = parseInt(input);
+            if (isNaN(idx) || idx >= this.getCurrentPlayer().battleZone.length) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            const card = this.getCurrentPlayer().battleZone[idx];
+            if (!card || card.isTapped || card.cantAttack) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            // 5.2 Player selects eligible target (creature / shield(s))
+            // Notes conitnued in funtion
+            await this.findAttackTarget(idx);
+        }
+
         this.setCurrentPhase(Phase.end);
     }
 
@@ -384,5 +405,14 @@ export default class Game implements GameAttributes {
             }
             break;
         }
+    }
+    // TODO: write and test
+    async findAttackTarget(attackingCreatureId: number) {
+        // 5.2.1 Trigger onAttack() effect of attacker
+        // 5.2.2 Trigger onOtherCreatureAttack() effect of other creatures
+        // if creature
+        // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
+        // elif shield
+        // 5.2.3 Trigger onShieldTrigger() effect of shield
     }
 }
