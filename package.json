@@ -1,0 +1,15 @@
+{
+    "scripts": {
+        "test": "npm run test-env && jest --testTimeout 5000 out/tests",
+        "_test": "npm run build && npm run _test",
+        "build": "tsc --project tsconfig.project.json",
+        "tsc-watch": "tsc --project tsconfig.project.json -w",
+        "test-env": "set NODE_ENV=test"
+    },
+    "devDependencies": {
+        "@types/jest": "^26.0.14",
+        "@types/node": "^14.11.8",
+        "jest": "^26.5.2",
+        "typescript": "^4.0.3"
+    }
+}

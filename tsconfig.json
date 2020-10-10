@@ -1,0 +1,18 @@
+
+{
+    "compilerOptions": {
+        "target": "ES5",
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "skipLibCheck": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "module": "esnext",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "isolatedModules": false,
+        "jsx": "preserve",
+        "types": ["jest", "node"]
+    },
+    "exclude": ["node_modules", "app"],
+    "include": ["**/*.ts"]
+}

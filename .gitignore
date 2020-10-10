@@ -1,20 +1,13 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+/app/node_modules
 /app/public/assets/cards
 /app/public/assets/thumbs
 /app/public/assets/data
 
 
-# dependencies
-/app/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/app/coverage
-
-# production
-/app/build
+node_modules
+out
 
 # misc
 .ideas
