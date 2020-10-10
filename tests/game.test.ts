@@ -1,25 +1,24 @@
 import Game from '../src/game';
 import { Phase, Civilization } from '../src/types';
 import AquaHulcus from '../src/cards/AquaHulcus';
+import BurningMane from '../src/cards/BurningMane';
 import { TESTING_BREAKPOINT } from '../src/utils';
 
 test('Correct environment', () => {
     expect(process.env.NODE_ENV).toBe('test');
 });
 
-test('Runs out of cards and loses', () => {
-    const game = new Game();
-    expect(() => game.drawCard('player1')).toThrow('player1 defeated!');
-});
-
-// Methods
+/** METHODS */
 
 test('Game.drawCard()', () => {
     const game = new Game();
     game.state.player1.deck = [new AquaHulcus(game.getGame, 'player1'), new AquaHulcus(game.getGame, 'player1')];
     game.drawCard('player1');
+    // card moves to hand
     expect(game.state.player1.deck.length).toBe(1);
     expect(game.state.player1.hand.length).toBe(1);
+    // lose game
+    expect(() => game.drawCard('player1')).toThrow('player1 defeated!');
 });
 
 test('Game.popCard()', () => {
@@ -53,6 +52,14 @@ test('Game.addManaFromHand()', () => {
     expect(game.state.player1.manaZone.length).toBe(1);
 });
 
+test('Game.addCreatureFromHandToBattleZone()', () => {
+    const game = new Game();
+    game.state.player1.hand = [new AquaHulcus(game.getGame, 'player1')];
+    game.addCreatureFromHandToBattleZone('player1', 0);
+    expect(game.state.player1.hand.length).toBe(0);
+    expect(game.state.player1.battleZone.length).toBe(1);
+});
+
 test('Game.tapMana()', () => {
     const game = new Game();
     game.state.player1.manaZone = [new AquaHulcus(game.getGame, 'player1')];
@@ -79,7 +86,128 @@ test('Game.untapCreature()', () => {
     expect(game.state.player1.battleZone[0].isTapped).toBe(false);
 });
 
-// Phases
+test('Game.castUsingMana - test cancel casting (N)', async () => {
+    const game = new Game();
+    game.state.player1.hand = [new AquaHulcus(game.getGame, 'player1')];
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('N');
+    game._getUserInput = mock1;
+
+    const mock2 = jest.fn();
+    game._parseIdsList = mock2;
+
+    await game.castUsingMana(0);
+
+    expect(mock2).not.toBeCalled();
+});
+
+test('Game.castUsingMana - test bad input (![0-9,]+)', () => {
+    const game = new Game();
+    game.state.player1.hand = [new AquaHulcus(game.getGame, 'player1')];
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('');
+    game._getUserInput = mock1;
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('bad input');
+    game._getUserInput = mock2;
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    const mock3 = jest.fn();
+    mock3.mockResolvedValue('1,2,E,4');
+    game._getUserInput = mock3;
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.castUsingMana - test bad mana selection', () => {
+    const game = new Game();
+    const card = new AquaHulcus(game.getGame, 'player1');
+    game.state.player1.hand = [card];
+    game.state.player1.manaZone = [];
+
+    // bad idx
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('4');
+    game._getUserInput = mock1;
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    // !== manaCost
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('0,1');
+    game._getUserInput = mock2;
+    game.state.player1.manaZone = [card, card];
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    // 1,2,2,3,3
+    const mock3 = jest.fn();
+    mock3.mockResolvedValue('0,1,1,2,2');
+    game._getUserInput = mock3;
+    game.state.player1.manaZone = [card, card, card];
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    // missing civilization
+    const mock4 = jest.fn();
+    mock4.mockResolvedValue('0,1,2');
+    game._getUserInput = mock4;
+
+    const bm = new BurningMane(game.getGame, 'player2');
+    game.state.player1.manaZone = [bm, bm, bm];
+
+    // not enough mana
+    const mock5 = jest.fn();
+    mock5.mockResolvedValue('0,1,2');
+    game._getUserInput = mock5;
+    game.state.player1.manaZone = [card, card, card];
+    game.tapMana('player1', 0);
+    game.tapMana('player1', 1);
+    game.tapMana('player1', 2);
+
+    expect(() => game.castUsingMana(0)).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.castUsingMana - test ends on good input ([0-9,]+)', async () => {
+    const game = new Game();
+    game.state.player1.hand = [new BurningMane(game.getGame, 'player1')];
+    game.state.player1.manaZone = [new BurningMane(game.getGame, 'player1'), new AquaHulcus(game.getGame, 'player1')];
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('1,0');
+    game._getUserInput = mock1;
+
+    const mock2 = jest.fn();
+    game.tapMana = mock2;
+
+    const mock3 = jest.fn();
+    game.addCreatureFromHandToBattleZone = mock3;
+
+    await game.castUsingMana(0);
+    expect(mock2).toHaveBeenNthCalledWith(1, 'player1', 1);
+    expect(mock2).toHaveBeenNthCalledWith(2, 'player1', 0);
+    expect(mock3).toHaveBeenCalled();
+
+    const mock4 = jest.fn();
+    mock4.mockResolvedValue('2,1,0');
+    game._getUserInput = mock4;
+
+    const card = new AquaHulcus(game.getGame, 'player1');
+    const mock5 = jest.fn();
+    card.onCast = mock5;
+    game.state.player1.hand = [card];
+    game.state.player1.manaZone = [
+        new AquaHulcus(game.getGame, 'player1'),
+        new AquaHulcus(game.getGame, 'player1'),
+        new AquaHulcus(game.getGame, 'player1'),
+    ];
+
+    await game.castUsingMana(0);
+    expect(mock5).toHaveBeenCalled();
+});
+
+/** PHASES */
+// - Start
 test('Game.runStartPhase - test end phase (N)', async () => {
     const game = new Game();
     const mock = jest.fn();
@@ -142,6 +270,7 @@ test('Game.runStartPhase - test loops through good input ([0-9,]+)', async () =>
     expect(game.state.player1.battleZone[0].isTapped).toBe(false);
 });
 
+// - Draw
 test('Game.runDrawPhase', () => {
     const game = new Game();
 
@@ -221,9 +350,58 @@ test('Game.runManaPhase - test loops (turnManaCount > 1)', async () => {
     expect(game.state.player1.manaZone.length).toBe(2);
 });
 
-// TODO: runPlayPhase
+// - Play
+test('Game.runPlayPhase - test end phase (N)', async () => {
+    const game = new Game();
+    const mock = jest.fn();
+    mock.mockResolvedValue('N');
+    game._getUserInput = mock;
+    await game.runPlayPhase();
+
+    expect(game.getCurrentPhase()).toBe(Phase.attack);
+});
+
+test('Game.runPlayPhase - test bad input (![0-9])', () => {
+    const game = new Game();
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('');
+    game._getUserInput = mock1;
+
+    expect(() => game.runPlayPhase()).rejects.toBe(TESTING_BREAKPOINT);
+
+    game.state.player1.hand = [new AquaHulcus(game.getGame, 'player1')];
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('1');
+    game._getUserInput = mock2;
+
+    expect(() => game.runPlayPhase()).rejects.toBe(TESTING_BREAKPOINT);
+
+    const mock3 = jest.fn();
+    mock3.mockResolvedValue('also bad input');
+    game._getUserInput = mock3;
+
+    expect(() => game.runPlayPhase()).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.runPlayPhase - test loops good input ([0-9])', async () => {
+    const game = new Game();
+    const mock1 = jest.fn();
+    mock1.mockResolvedValueOnce('0').mockResolvedValueOnce('n');
+    game._getUserInput = mock1;
+
+    const mock2 = jest.fn();
+    game.castUsingMana = mock2;
+
+    game.state.player1.hand = [new AquaHulcus(game.getGame, 'player1')];
+    await game.runPlayPhase();
+
+    expect(mock1).toBeCalledTimes(2);
+    expect(mock2).toBeCalledWith(0);
+});
+
 // TODO: runAttackPhase
 
+// - End
 test('Game.runEndPhase()', () => {
     const game = new Game();
     const currentplayer = game.getCurrentPlayerId();

@@ -130,7 +130,6 @@ export default class Game implements GameAttributes {
     }
 
     async runStartPhase() {
-        // TODO:
         // 1. Start
         const currentPlayerId = this.getCurrentPlayerId();
 
@@ -176,7 +175,6 @@ export default class Game implements GameAttributes {
                 if (idx < numManaZone) {
                     this.untapMana(currentPlayerId, i);
                 } else if (idx < totalUntapped) {
-                    console.log('new idx', idx - numManaZone);
                     this.untapCreature(currentPlayerId, idx - numManaZone);
                 }
             }
@@ -195,7 +193,7 @@ export default class Game implements GameAttributes {
                 this.drawCard(this.getCurrentPlayerId());
             }
         }
-        
+
         this.setCurrentPhase(Phase.mana);
     }
 
@@ -206,7 +204,7 @@ export default class Game implements GameAttributes {
         while (true) {
             // 3.1 Player may add cards to their mana zone from their hand equal to their 'turnManaCount'
             const input = await this._getUserInput(
-                'Select a card to play from your mana zone ([0-9+]: Target card, [N]: End phase)',
+                'Select a card to add to your mana zone ([0-9+]: Target card, [N]: End phase)',
             );
             if (!input) {
                 if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
@@ -233,12 +231,28 @@ export default class Game implements GameAttributes {
         this.setCurrentPhase(Phase.play);
     }
 
-    // TODO write & test
     async runPlayPhase() {
         // 4. Play cards
         // 4.1 Player may play any number of cards from their hand
-        // 4.1.1 Tap mana equal to card cost. At least 1 mana must match the Ciivilization of the card being played
-        // 4.1.1 Trigger onCast() function on card
+        while (true) {
+            const input = await this._getUserInput(
+                'Select a creature or spell to play ([0-9+]: Target card, [N]: End phase)',
+            );
+            if (!input) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if (input.toLowerCase() === 'n') {
+                break;
+            }
+            const idx = parseInt(input);
+            if (isNaN(idx) || idx >= this.getCurrentPlayer().hand.length) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            // NOTE: cont.. in castUsingMana
+            await this.castUsingMana(idx);
+        }
         this.setCurrentPhase(Phase.attack);
     }
 
@@ -271,7 +285,7 @@ export default class Game implements GameAttributes {
     drawCard(targetPlayer: PlayerId) {
         if (!this.state[targetPlayer].deck.length) this.loseGame(targetPlayer);
         const card = this.state[targetPlayer].deck.pop();
-        this.state[targetPlayer].hand.push(Library.getCard(card.no);
+        this.state[targetPlayer].hand.push(Library.getCard(card.no, this.getGame, targetPlayer));
         if (!this.state[targetPlayer].deck.length) this.loseGame(targetPlayer);
     }
     popCard(arr: Array<Card>, idx: number): Card {
@@ -293,7 +307,11 @@ export default class Game implements GameAttributes {
     }
     addManaFromHand(targetPlayer: PlayerId, idx: number) {
         const card = this.popCard(this.state[targetPlayer].hand, idx);
-        this.state[targetPlayer].manaZone.push(Library.getCard(card.no));
+        this.state[targetPlayer].manaZone.push(Library.getCard(card.no, this.getGame, targetPlayer));
+    }
+    addCreatureFromHandToBattleZone(targetPlayer: PlayerId, idx: number) {
+        const card = this.popCard(this.state[targetPlayer].hand, idx);
+        this.state[targetPlayer].battleZone.push(Library.getCard(card.no, this.getGame, targetPlayer));
     }
     tapMana(targetPlayer: PlayerId, idx: number): Civilization {
         this.state[targetPlayer].manaZone[idx].isTapped = true;
@@ -307,5 +325,64 @@ export default class Game implements GameAttributes {
     }
     untapCreature(targetPlayer: PlayerId, idx: number) {
         this.state[targetPlayer].battleZone[idx].isTapped = false;
+    }
+    async castUsingMana(idx: number) {
+        const targetPlayer = this.getCurrentPlayerId();
+        const card = this.getCurrentPlayer().hand[idx];
+        const targetCivilization = card.civilization;
+        const manaCost = card.manaCost;
+
+        while (true) {
+            // 4.1.1 Tap mana equal to card cost. At least 1 mana must match the Ciivilization of the card being played
+            const input = await this._getUserInput(
+                'Select mana to use for casting ([0-9+]: Target card, [N]: Cancel casting)',
+            );
+            if (!input) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if (input.toLowerCase() === 'n') {
+                break;
+            }
+            // Test ids are valid
+            const ids = this._parseIdsList(input);
+            if (ids.length !== manaCost || new Set(ids).size !== ids.length) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            let hasCivilization = false;
+            let isBadId = false;
+            for (const i of ids) {
+                const mana = this.getCurrentPlayer().manaZone[i];
+                if (!mana || mana.isTapped) {
+                    if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                    isBadId = true;
+                    break;
+                }
+                if (mana.civilization === targetCivilization) {
+                    hasCivilization = true;
+                }
+            }
+            if (!hasCivilization || isBadId) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            // Tap mana
+            for (const i of ids) {
+                this.tapMana(targetPlayer, i);
+            }
+
+            // if creature add to battleZone
+            if (card.type === 'Creature') {
+                this.addCreatureFromHandToBattleZone(targetPlayer, idx);
+            }
+
+            // 4.1.1 Trigger onCast() function on card
+            if ('onCast' in card) {
+                card.onCast();
+            }
+            break;
+        }
     }
 }
