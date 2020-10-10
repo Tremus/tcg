@@ -21,6 +21,7 @@ export type PlayerId = 'player1' | 'player2';
 type CardType = 'Creature' | 'Spell';
 
 export type GameState = {
+    turnCount: number;
     player1: Player;
     player2: Player;
     activePlayer: PlayerId;

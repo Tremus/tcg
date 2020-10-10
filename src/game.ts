@@ -49,6 +49,7 @@ export default class Game implements GameAttributes {
 
     constructor() {
         this.state = {
+            turnCount: 1,
             player1: getEmptyPlayer(),
             player2: getEmptyPlayer(),
             activePlayer: 'player1',
@@ -82,6 +83,7 @@ export default class Game implements GameAttributes {
     }
 
     // PHASES
+    // TODO: write and test
     setup() {
         // restarts the game
         // TODO:
@@ -90,6 +92,7 @@ export default class Game implements GameAttributes {
         // Add 5 cards to shields
         // Add 5 cards to hand
         // Determine first player
+        this.state.turnCount = 1;
         this.setCurrentPlayer(this._determineFirstPlayer());
     }
 
@@ -113,7 +116,7 @@ export default class Game implements GameAttributes {
             if (this.state.phase === Phase.start) {
                 await this.runStartPhase();
             } else if (this.state.phase === Phase.draw) {
-                await this.runDrawPhase();
+                this.runDrawPhase();
             } else if (this.state.phase === Phase.mana) {
                 await this.runManaPhase();
             } else if (this.state.phase === Phase.play) {
@@ -183,11 +186,16 @@ export default class Game implements GameAttributes {
         this.setCurrentPhase(Phase.draw);
     }
 
-    // TODO write & test
-    async runDrawPhase() {
+    runDrawPhase() {
         // 2. Draw
         // 2.1 If player is playing first they skip their first draw step
-        // 2.2 (DRAW STEP) Player MUST draw cards equal to their 'turnDrawCount' (if final card is drawn, lose game)
+        if (this.state.turnCount > 1) {
+            // 2.2 (DRAW STEP) Player MUST draw cards equal to their 'turnDrawCount' (if final card is drawn, lose game)
+            for (let i = 0; i < this.getCurrentPlayer().turnDrawCount; i++) {
+                this.drawCard(this.getCurrentPlayerId());
+            }
+        }
+        
         this.setCurrentPhase(Phase.mana);
     }
 
@@ -253,6 +261,7 @@ export default class Game implements GameAttributes {
         // 6.1 Trigger onEndTurn() effect
         this._toggleActivePlayer();
         this.setCurrentPhase(Phase.start);
+        this.state.turnCount++;
     }
 
     // METHODS

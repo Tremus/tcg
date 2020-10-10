@@ -142,7 +142,25 @@ test('Game.runStartPhase - test loops through good input ([0-9,]+)', async () =>
     expect(game.state.player1.battleZone[0].isTapped).toBe(false);
 });
 
-// TODO: runDrawPhase
+test('Game.runDrawPhase', () => {
+    const game = new Game();
+
+    const mock = jest.fn();
+    game.drawCard = mock;
+
+    // skips on turn 1
+    game.state.turnCount = 1;
+    game.runDrawPhase();
+
+    expect(mock).not.toHaveBeenCalled();
+
+    // calls Game.drawCard() equal to turnDrawCount
+    game.state.turnCount = 3;
+    game.state.player1.turnDrawCount = 2;
+    game.runDrawPhase();
+
+    expect(mock).toHaveBeenCalledTimes(2);
+});
 
 test('Game.runManaPhase - test end phase (N)', async () => {
     const game = new Game();
@@ -212,9 +230,11 @@ test('Game.runEndPhase()', () => {
     const opposingplayer = game.getOpposingPlayerId();
     expect(currentplayer).not.toBe(opposingplayer);
 
-    game.setCurrentPhase(Phase.end);
+    const currentTurn = game.state.turnCount;
+
     game.runEndPhase();
 
     expect(game.getCurrentPhase()).toBe(Phase.start);
     expect(game.getCurrentPlayerId()).toBe(opposingplayer);
+    expect(game.state.turnCount).toBe(currentTurn + 1);
 });
