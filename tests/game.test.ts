@@ -547,21 +547,113 @@ test('Game.runAttackPhase - test bad target', () => {
     expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
 });
 
-// keep writing
 test('Game.runAttackPhase - test loops on good input ([0-9])', async () => {
     const game = new Game();
     game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
 
-    const mock1 = jest.fn();
-    mock1.mockResolvedValueOnce('0').mockResolvedValueOnce('N');
-    game._getUserInput = mock1;
-
-    const mock2 = jest.fn();
-    game.findAttackTarget = mock2;
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn();
 
     await game.runAttackPhase();
 
-    expect(mock2).toBeCalledWith(0);
+    expect(game._getUserInput).toBeCalled;
+    expect(game.findAttackTarget).toBeCalledWith(0);
+});
+
+test('Game.runAttackPhase - test attacking taps attacking creature', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+    game.state.player2.shieldZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(0);
+    game.tapCreature = jest.fn().mockImplementation(() => {
+        throw 1;
+    });
+
+    expect(() => game.runAttackPhase()).rejects.toBe(1);
+});
+
+test('Game.runAttackPhase - attacks player directly', () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(0);
+
+    expect(() => game.runAttackPhase()).rejects.toBe(`player2 defeated!`);
+});
+
+test('Game.runAttackPhase - creature gets blocked', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(0);
+    game.getBlockingCreature = jest.fn().mockResolvedValue(3);
+    game.battleCreatures = jest.fn();
+
+    await game.runAttackPhase();
+    expect(game.battleCreatures).toBeCalledWith(0, 3);
+});
+
+test('Game.runAttackPhase - creature doesnt get blocked', () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(0);
+    game.loseGame = jest.fn().mockImplementation(() => {
+        throw 80085;
+    });
+
+    expect(() => game.runAttackPhase()).rejects.toBe(80085);
+});
+
+test('Game.runAttackPhase - creature attacks a shield', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+    game.state.player2.shieldZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(0);
+    game.attackShield = jest.fn();
+
+    await game.runAttackPhase();
+
+    expect(game.attackShield).toBeCalledWith(0, 0);
+});
+
+test('Game.runAttackPhase - creature attacks a creature (with no shields)', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+    game.state.player2.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+
+    game.tapCreature('player2', 0);
+
+    // no shields
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(1);
+    game.battleCreatures = jest.fn();
+
+    await game.runAttackPhase();
+    expect(game.battleCreatures).toBeCalledWith(0, 0);
+});
+
+test('Game.runAttackPhase - creature attacks a creature (with shields)', async () => {
+    const game = new Game();
+    game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+    game.state.player2.battleZone = [new AquaHulcus(game.getGame, 'player1')];
+    game.state.player2.shieldZone = [new AquaHulcus(game.getGame, 'player1'), new AquaHulcus(game.getGame, 'player1')];
+
+    game.tapCreature('player2', 0);
+
+    game._getUserInput = jest.fn().mockResolvedValueOnce('0').mockResolvedValueOnce('N');
+    game.findAttackTarget = jest.fn().mockResolvedValue(2);
+    game.battleCreatures = jest.fn();
+
+    await game.runAttackPhase();
+    expect(game.battleCreatures).toBeCalledWith(0, 0);
 });
 
 // - End

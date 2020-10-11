@@ -281,21 +281,47 @@ export default class Game implements GameAttributes {
                 continue;
             }
 
-            const card = this.getCurrentPlayer().battleZone[idx];
-            if (!card || card.isTapped || card.cannotAttack) {
+            const attackingCreature = this.getCurrentPlayer().battleZone[idx];
+            if (!attackingCreature || attackingCreature.isTapped || attackingCreature.cannotAttack) {
                 if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
                 continue;
             }
 
             // 5.2 Player selects eligible target (creature / shield(s))
             const attackTargetIdx = await this.findAttackTarget(idx);
+            if (attackTargetIdx === -1) {
+                // player cancelled attacking
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            this.tapCreature(this.getCurrentPlayerId(), idx);
 
             // 5.2.1 Trigger onAttack() effect of attacker
+            if ('onAttack' in attackingCreature) {
+                await attackingCreature.onAttack(attackTargetIdx);
+            }
+
+            // canBlockedBy()
             // 5.2.2 Trigger onOtherCreatureAttack() effect of other creatures
-            // if creature
-            // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
-            // elif shield
-            // 5.2.3 Trigger onShieldTrigger() effect of shield
+            if (!attackingCreature.isUnblockable) {
+                const blockingCreatureIdx = await this.getBlockingCreature(idx);
+                if (blockingCreatureIdx !== -1) {
+                    await this.battleCreatures(idx, blockingCreatureIdx);
+                    continue;
+                }
+            }
+
+            if (numOpponentShields === 0 && attackTargetIdx === 0) {
+                // attacks player directly
+                this.loseGame(this.getOpposingPlayerId());
+            } else if (attackTargetIdx < numOpponentShields) {
+                await this.attackShield(idx, attackTargetIdx);
+            } else {
+                // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
+                const creatureIdx = numOpponentShields ? attackTargetIdx - numOpponentShields : attackTargetIdx - 1;
+                await this.battleCreatures(idx, creatureIdx);
+            }
         }
 
         this.setCurrentPhase(Phase.end);
@@ -310,7 +336,7 @@ export default class Game implements GameAttributes {
     }
 
     // METHODS
-    private loseGame(targetPlayer: PlayerId) {
+    loseGame(targetPlayer: PlayerId) {
         throw `${targetPlayer} defeated!`;
     }
     drawCard(targetPlayer: PlayerId) {
@@ -466,5 +492,29 @@ export default class Game implements GameAttributes {
             }
             return idx;
         }
+    }
+    // TODO: write & test
+    async getBlockingCreature(attackingCreatureIdx: number): Promise<number> {
+        return -1;
+    }
+    // TODO: write & test
+    async attackShield(targetCreatureIdx: number, targetShieldIdx: number) {
+        const creature = this.getCurrentPlayer().battleZone[targetCreatureIdx];
+        const shield = this.getOpposingPlayer().shieldZone[targetShieldIdx];
+
+        // TODO break shield
+        // 5.2.3 Trigger onShieldTrigger() effect of shield
+
+        // TODO handle double breakers
+    }
+    // TODO: write & test
+    async battleCreatures(targetCreatureIdx: number, targetShieldIdx: number) {
+        const attackingCreature = this.getCurrentPlayer().battleZone[targetCreatureIdx];
+        const opposingCreature = this.getOpposingPlayer().shieldZone[targetShieldIdx];
+
+        // TODO break shield
+        // 5.2.3 Trigger onShieldTrigger() effect of shield
+
+        // TODO handle double breakers
     }
 }

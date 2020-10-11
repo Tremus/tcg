@@ -53,7 +53,7 @@ export type Card = {
 
     // Abilities
     onCast?: Function;
-    onAttack?: Function;
+    onAttack?: (targetIdx: number) => Promise<void>;
     onAttacked?: Function;
     onTapForAbility?: Function;
     onDestroy?: Function;
@@ -73,9 +73,10 @@ export type Card = {
     cannotAttackCreatures?: boolean;
     canAttackUntappedCreatures?: boolean;
     canBeAttackedBy?: (card: Card) => Promise<boolean>;
+    canBeBlockedBy?: (card: Card) => Promise<boolean>;
 
     isBlocker?: boolean;
-    isBlockable?: boolean;
+    isUnblockable?: boolean;
 };
 
 export interface Creature extends Card {
