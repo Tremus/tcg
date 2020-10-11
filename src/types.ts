@@ -68,10 +68,11 @@ export type Card = {
     onEndPhase?: Function;
     onStartPhase?: Function;
 
-    cantAttack?: boolean;
-    canAttackPlayers?: boolean;
-    canAttackCreatures?: boolean;
+    cannotAttack?: boolean;
+    cannotAttackPlayers?: boolean;
+    cannotAttackCreatures?: boolean;
     canAttackUntappedCreatures?: boolean;
+    canBeAttackedBy?: (card: Card) => Promise<boolean>;
 
     isBlocker?: boolean;
     isBlockable?: boolean;

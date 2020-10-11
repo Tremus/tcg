@@ -259,6 +259,10 @@ export default class Game implements GameAttributes {
     async runAttackPhase() {
         // 5. Attack with creatures
         // 5.1 Player selects any number of eligible creatures to attack (eg. canAttack = true)
+        const numOpponentShields = this.getOpposingPlayer().shieldZone.length;
+        const numOpponentCreatures = this.getOpposingPlayer().battleZone.length;
+        const numAvailableTargets = numOpponentShields + numOpponentCreatures;
+
         while (true) {
             // 3.1 Player may add cards to their mana zone from their hand equal to their 'turnManaCount'
             const input = await this._getUserInput(
@@ -278,14 +282,20 @@ export default class Game implements GameAttributes {
             }
 
             const card = this.getCurrentPlayer().battleZone[idx];
-            if (!card || card.isTapped || card.cantAttack) {
+            if (!card || card.isTapped || card.cannotAttack) {
                 if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
                 continue;
             }
 
             // 5.2 Player selects eligible target (creature / shield(s))
-            // Notes conitnued in funtion
-            await this.findAttackTarget(idx);
+            const attackTargetIdx = await this.findAttackTarget(idx);
+
+            // 5.2.1 Trigger onAttack() effect of attacker
+            // 5.2.2 Trigger onOtherCreatureAttack() effect of other creatures
+            // if creature
+            // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
+            // elif shield
+            // 5.2.3 Trigger onShieldTrigger() effect of shield
         }
 
         this.setCurrentPhase(Phase.end);
@@ -406,13 +416,55 @@ export default class Game implements GameAttributes {
             break;
         }
     }
-    // TODO: write and test
-    async findAttackTarget(attackingCreatureId: number) {
-        // 5.2.1 Trigger onAttack() effect of attacker
-        // 5.2.2 Trigger onOtherCreatureAttack() effect of other creatures
-        // if creature
-        // 5.2.3 Trigger onTargetedByCreature() effect of attacked creture
-        // elif shield
-        // 5.2.3 Trigger onShieldTrigger() effect of shield
+    async findAttackTarget(attackingCreatureIdx: number): Promise<number> {
+        // Display battle zone of opponent
+        // eg 1. 2 shields, 1 creature
+        // - Shield Zone
+        // [0] Shield
+        // [1] Shield
+        // - Battle Zone
+        // [2] Aqua Hulcus
+
+        // eg 2. 0 shields, 1 creature
+        // - Shield Zone
+        // [0] Player
+        // - Battle Zone
+        // [1] Aqua Hulcus
+
+        const attackingCreature = this.getCurrentPlayer().battleZone[attackingCreatureIdx];
+        const numOpponentShields = this.getOpposingPlayer().shieldZone.length;
+        const numOpponentCreatures = this.getOpposingPlayer().battleZone.length;
+        const numAvailableTargets = numOpponentShields + numOpponentCreatures;
+
+        while (true) {
+            const input = await this._getUserInput(
+                'Select a creature to attack with ([0-9+]: Target card, [N]: Cancel attack)',
+            );
+            if (!input) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if (input.toLowerCase() === 'n') {
+                return -1;
+            }
+            const idx = parseInt(input);
+            if (isNaN(idx) || idx >= numAvailableTargets) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            if (idx >= numOpponentShields) {
+                const attackedCreature = this.getOpposingPlayer().battleZone[idx - numOpponentShields];
+                if ('canBeAttackedBy' in attackedCreature && !attackedCreature.canBeAttackedBy(attackingCreature)) {
+                    if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                    continue;
+                }
+                if (!attackedCreature.isTapped && !attackingCreature.canAttackUntappedCreatures) {
+                    if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                    continue;
+                }
+            }
+            return idx;
+        }
     }
 }

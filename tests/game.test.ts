@@ -206,6 +206,97 @@ test('Game.castUsingMana - test ends on good input ([0-9,]+)', async () => {
     expect(mock5).toHaveBeenCalled();
 });
 
+test('Game.findAttackTarget - test cancel attacking (N)', async () => {
+    const game = new Game();
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('N');
+    game._getUserInput = mock1;
+
+    const result = await game.findAttackTarget(0);
+    expect(result).toBe(-1);
+});
+
+test('Game.findAttackTarget - test bad input (![0-9,]+)', () => {
+    const game = new Game();
+
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('');
+    game._getUserInput = mock1;
+    expect(() => game.findAttackTarget(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue('bad input');
+    game._getUserInput = mock2;
+    expect(() => game.findAttackTarget(0)).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.findAttackTarget - test bad target [0-9]+', () => {
+    const game = new Game();
+    const card1 = new AquaHulcus(game.getGame, 'player1');
+    game.state.player1.battleZone = [card1];
+    game.state.player2.shieldZone = [card1, card1];
+    game.state.player2.battleZone = [card1];
+
+    // bad idx
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('3');
+    game._getUserInput = mock1;
+    expect(() => game.findAttackTarget(0)).rejects.toBe(TESTING_BREAKPOINT);
+
+    // canBeAttackedBy = false
+    const card2 = new AquaHulcus(game.getGame, 'player1');
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue(false);
+    (card2 as Card).canBeAttackedBy = mock2;
+    game.state.player2.battleZone = [card2];
+
+    expect(() => game.findAttackTarget(0)).rejects.toBe(TESTING_BREAKPOINT);
+    expect(mock2).toBeCalled;
+
+    // attackedCreature.isTapped = false | undefined
+    const mock3 = jest.fn();
+    mock3.mockResolvedValue('2');
+    game._getUserInput = mock3;
+    expect(() => game.findAttackTarget(0)).rejects.toBe(TESTING_BREAKPOINT);
+});
+
+test('Game.findAttackTarget - test ends on good input ([0-9,]+)', async () => {
+    const game = new Game();
+
+    const card1 = new AquaHulcus(game.getGame, 'player1');
+    game.state.player1.battleZone = [card1];
+    game.state.player2.shieldZone = [card1, card1];
+    game.state.player2.battleZone = [card1];
+
+    game.tapCreature('player2', 0);
+
+    // good idx
+    const mock1 = jest.fn();
+    mock1.mockResolvedValue('2');
+    game._getUserInput = mock1;
+    const result1 = await game.findAttackTarget(0);
+    expect(result1).toBe(2);
+
+    // canBeAttackedBy = true
+    const card2 = new AquaHulcus(game.getGame, 'player1');
+    const mock2 = jest.fn();
+    mock2.mockResolvedValue(true);
+    (card2 as Card).canBeAttackedBy = mock2;
+    game.state.player2.battleZone = [card2];
+    game.tapCreature('player2', 0);
+
+    const result2 = await game.findAttackTarget(0);
+    expect(result2).toBe(2);
+
+    // canAttackUntappedCreatures = true
+    game.untapCreature('player2', 0);
+    game.state.player1.battleZone[0].canAttackUntappedCreatures = true;
+
+    const result3 = await game.findAttackTarget(0);
+    expect(result3).toBe(2);
+});
+
 /** PHASES */
 // - Start
 test('Game.runStartPhase - test end phase (N)', async () => {
@@ -450,12 +541,13 @@ test('Game.runAttackPhase - test bad target', () => {
 
     // target cannot attack
     const card = new AquaHulcus(game.getGame, 'player1');
-    (card as Card).cantAttack = true;
+    (card as Card).cannotAttack = true;
     game.state.player1.battleZone = [card];
 
     expect(() => game.runAttackPhase()).rejects.toBe(TESTING_BREAKPOINT);
 });
 
+// keep writing
 test('Game.runAttackPhase - test loops on good input ([0-9])', async () => {
     const game = new Game();
     game.state.player1.battleZone = [new AquaHulcus(game.getGame, 'player1')];
