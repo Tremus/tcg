@@ -74,6 +74,7 @@ export type Card = {
     canAttackUntappedCreatures?: boolean;
     canBeAttackedBy?: (card: Card) => Promise<boolean>;
     canBeBlockedBy?: (card: Card) => Promise<boolean>;
+    canBlock?: (card: Card) => Promise<boolean>;
 
     isBlocker?: boolean;
     isUnblockable?: boolean;

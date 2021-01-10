@@ -493,9 +493,42 @@ export default class Game implements GameAttributes {
             return idx;
         }
     }
-    // TODO: write & test
+    // TODO: test
     async getBlockingCreature(attackingCreatureIdx: number): Promise<number> {
-        return -1;
+        const attackingCard = this.getCurrentPlayer().battleZone[attackingCreatureIdx];
+
+        while (true) {
+            const input = await this._getUserInput(
+                'Select a creature to attack with ([0-9+]: Target card, [N]: Cancel attack)',
+            );
+            if (!input) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if (input.toLowerCase() === 'n') {
+                return -1;
+            }
+            const idx = parseInt(input);
+            if (isNaN(idx) || idx >= this.getOpposingPlayer().battleZone.length) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+
+            const targetBlocker = this.getOpposingPlayer().battleZone[idx];
+            if (targetBlocker.isTapped || !targetBlocker.isBlocker) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if ('canBeBlockedBy' in attackingCard && !attackingCard.canBeBlockedBy(targetBlocker)) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            if ('canBlock' in targetBlocker && !targetBlocker.canBlock(attackingCard)) {
+                if (NODE_ENV === 'test') throw TESTING_BREAKPOINT;
+                continue;
+            }
+            return idx;
+        }
     }
     // TODO: write & test
     async attackShield(targetCreatureIdx: number, targetShieldIdx: number) {
